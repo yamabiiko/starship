@@ -10,7 +10,8 @@ pub mod logger;
 pub mod module;
 mod modules;
 pub mod print;
-mod segment;
+pub mod segment;
+pub mod git;
 mod utils;
 
 #[cfg(test)]
