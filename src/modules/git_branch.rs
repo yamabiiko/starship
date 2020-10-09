@@ -25,7 +25,12 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
         config.truncation_length as usize
     };
 
+<<<<<<< HEAD
     let repo = context.get_repo().ok()?;
+=======
+    let repo = context.repo().as_ref()?;
+    let branch_name = repo.branch();
+>>>>>>> 0245977... Update git_commit
 
     let repo_root = repo.root.as_ref()?;
     let git_repo = Repository::open(repo_root).ok()?;
