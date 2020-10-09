@@ -1,7 +1,7 @@
 use crate::config::StarshipConfig;
+use crate::git::Repository;
 use crate::module::Module;
 use crate::modules;
-use crate::git::Repository;
 
 use clap::ArgMatches;
 // use git2::{ErrorCode::UnbornBranch, Repository, RepositoryState};
@@ -157,8 +157,9 @@ impl<'a> Context<'a> {
     }
 
     /// Will lazily get repo root and branch when a module requests it.
-    pub fn get_repo(&self) -> Result<&Repo, std::io::Error> {
+    pub fn repo(&self) -> &Option<Repository> {
         self.repo
+<<<<<<< HEAD
             .get_or_try_init(|| -> Result<Repo, std::io::Error> {
                 let repository = if env::var("GIT_DIR").is_ok() {
                     Repository::open_from_env().ok()
@@ -182,6 +183,9 @@ impl<'a> Context<'a> {
                     remote,
                 })
             })
+=======
+            .get_or_init(|| Repository::discover(&self.current_dir))
+>>>>>>> 532ca80... Replace git_status logic
     }
 
     pub fn dir_contents(&self) -> Result<&DirContents, std::io::Error> {
@@ -303,6 +307,7 @@ impl DirContents {
     }
 }
 
+<<<<<<< HEAD
 pub struct Repo {
     /// If `current_dir` is a git repository or is contained within one,
     /// this is the current branch name of that repo.
@@ -325,6 +330,8 @@ pub struct Remote {
     pub name: Option<String>,
 }
 
+=======
+>>>>>>> 532ca80... Replace git_status logic
 // A struct of Criteria which will be used to verify current PathBuf is
 // of X language, criteria can be set via the builder pattern
 pub struct ScanDir<'a> {
@@ -359,6 +366,7 @@ impl<'a> ScanDir<'a> {
     }
 }
 
+<<<<<<< HEAD
 fn get_current_branch(repository: &Repository) -> Option<String> {
     let head = match repository.head() {
         Ok(reference) => reference,
@@ -410,6 +418,8 @@ fn get_remote_repository_info(repository: &Repository) -> Option<Remote> {
     None
 }
 
+=======
+>>>>>>> 532ca80... Replace git_status logic
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Shell {
     Bash,

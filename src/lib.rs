@@ -5,13 +5,12 @@ pub mod configs;
 pub mod configure;
 pub mod context;
 pub mod formatter;
-pub mod init;
+pub mod git;
 pub mod logger;
 pub mod module;
 mod modules;
 pub mod print;
 pub mod segment;
-pub mod git;
 mod utils;
 
 #[cfg(test)]
