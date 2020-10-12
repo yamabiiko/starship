@@ -1,9 +1,7 @@
-use git2::RepositoryState;
-use std::path::PathBuf;
-
 use super::{Context, Module, RootModuleConfig};
 use crate::configs::git_state::GitStateConfig;
 use crate::formatter::StringFormatter;
+use crate::git::GitState;
 
 /// Creates a module with the state of the git repository at the current directory
 ///
@@ -14,9 +12,9 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
     let config: GitStateConfig = GitStateConfig::try_load(module.config);
 
     let repo = context.repo().as_ref()?;
-    let repo_root = repo.root_dir;
+    let repo_state = repo.state();
 
-    let state_description = get_state_description(repo_state, repo_root, &config)?;
+    let state_description = get_state_description(repo_state, &config)?;
 
     let parsed = StringFormatter::new(config.format).and_then(|formatter| {
         formatter
@@ -51,122 +49,53 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
 ///
 /// During a git operation it will show: REBASING, BISECTING, MERGING, etc.
 fn get_state_description<'a>(
-    state: RepositoryState,
-    root: &'a std::path::PathBuf,
+    state: &'a GitState,
     config: &GitStateConfig<'a>,
 ) -> Option<StateDescription<'a>> {
     match state {
-        RepositoryState::Clean => None,
-        RepositoryState::Merge => Some(StateDescription {
+        GitState::Clean => None,
+        GitState::Merge => Some(StateDescription {
             label: config.merge,
             current: None,
             total: None,
         }),
-        RepositoryState::Revert => Some(StateDescription {
+        GitState::Revert => Some(StateDescription {
             label: config.revert,
             current: None,
             total: None,
         }),
-        RepositoryState::RevertSequence => Some(StateDescription {
-            label: config.revert,
-            current: None,
-            total: None,
-        }),
-        RepositoryState::CherryPick => Some(StateDescription {
+        GitState::CherryPick => Some(StateDescription {
             label: config.cherry_pick,
             current: None,
             total: None,
         }),
-        RepositoryState::CherryPickSequence => Some(StateDescription {
-            label: config.cherry_pick,
-            current: None,
-            total: None,
-        }),
-        RepositoryState::Bisect => Some(StateDescription {
+        GitState::Bisect => Some(StateDescription {
             label: config.bisect,
             current: None,
             total: None,
         }),
-        RepositoryState::ApplyMailbox => Some(StateDescription {
+        GitState::ApplyMailbox => Some(StateDescription {
             label: config.am,
             current: None,
             total: None,
         }),
-        RepositoryState::ApplyMailboxOrRebase => Some(StateDescription {
+        GitState::ApplyMailboxOrRebase => Some(StateDescription {
             label: config.am_or_rebase,
             current: None,
             total: None,
         }),
-        RepositoryState::Rebase => Some(describe_rebase(root, config.rebase)),
-        RepositoryState::RebaseInteractive => Some(describe_rebase(root, config.rebase)),
-        RepositoryState::RebaseMerge => Some(describe_rebase(root, config.rebase)),
-    }
-}
-
-fn describe_rebase<'a>(root: &'a PathBuf, rebase_config: &'a str) -> StateDescription<'a> {
-    /*
-     *  Sadly, libgit2 seems to have some issues with reading the state of
-     *  interactive rebases. So, instead, we'll poke a few of the .git files
-     *  ourselves. This might be worth re-visiting this in the future...
-     *
-     *  The following is based heavily on: https://github.com/magicmonty/bash-git-prompt
-     */
-
-    let dot_git = root.join(".git");
-    let dot_git = if let Ok(conf) = std::fs::read_to_string(&dot_git) {
-        let gitdir_re = regex::Regex::new(r"(?m)^gitdir: (.*)$").unwrap();
-        if let Some(caps) = gitdir_re.captures(&conf) {
-            root.join(caps.get(1).unwrap().as_str())
-        } else {
-            dot_git
-        }
-    } else {
-        dot_git
-    };
-
-    let has_path = |relative_path: &str| {
-        let path = dot_git.join(PathBuf::from(relative_path));
-        path.exists()
-    };
-
-    let file_to_usize = |relative_path: &str| {
-        let path = dot_git.join(PathBuf::from(relative_path));
-        let contents = crate::utils::read_file(path).ok()?;
-        let quantity = contents.trim().parse::<usize>().ok()?;
-        Some(quantity)
-    };
-
-    let paths_to_progress = |current_path: &str, total_path: &str| {
-        let current = file_to_usize(current_path)?;
-        let total = file_to_usize(total_path)?;
-        Some((current, total))
-    };
-
-    let progress = if has_path("rebase-merge/msgnum") {
-        paths_to_progress("rebase-merge/msgnum", "rebase-merge/end")
-    } else if has_path("rebase-apply") {
-        paths_to_progress("rebase-apply/next", "rebase-apply/last")
-    } else {
-        None
-    };
-
-    let (current, total) = if let Some((c, t)) = progress {
-        (Some(format!("{}", c)), Some(format!("{}", t)))
-    } else {
-        (None, None)
-    };
-
-    StateDescription {
-        label: rebase_config,
-        current,
-        total,
+        GitState::Rebase (rebase_progress) => Some(StateDescription {
+            label: config.rebase,
+            current: Some(&rebase_progress.current.to_string()),
+            total: Some(&rebase_progress.end.to_string()),
+        }),
     }
 }
 
 struct StateDescription<'a> {
     label: &'a str,
-    current: Option<String>,
-    total: Option<String>,
+    current: Option<&'a str>,
+    total: Option<&'a str>,
 }
 
 #[cfg(test)]

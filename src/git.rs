@@ -27,8 +27,15 @@ pub enum GitState {
     Revert,
     CherryPick,
     Bisect,
-    Rebase,
-    RebaseMerge(String, String),
+    ApplyMailbox,
+    ApplyMailboxOrRebase,
+    Rebase(RebaseProgress),
+}
+
+#[derive(PartialEq, Eq, Debug)]
+struct RebaseProgress {
+    pub current: usize,
+    pub end: usize,
 }
 
 #[derive(Debug, Default)]
@@ -116,19 +123,43 @@ impl Repository {
 
         let rebase_file = self.git_dir.join("REBASE_HEAD");
         if rebase_file.exists() {
-            let current_file = self.git_dir.join("rebase-merge/msgnum");
-            let current_value = fs::read_to_string(current_file).ok();
-
-            let end_file = self.git_dir.join("rebase-merge/end");
-            let end_value = fs::read_to_string(end_file).ok();
-
-            match (current_value, end_value) {
-                (Some(current), Some(end)) => return GitState::RebaseMerge(current, end),
-                _ => return GitState::Rebase,
-            }
+            let rebase_progress = self
+                .get_rebase_progress()
+                .unwrap_or_else(|| RebaseProgress { current: 1, end: 1 });
+            return GitState::Rebase(rebase_progress);
         }
 
         GitState::Clean
+    }
+
+    fn get_rebase_progress(&self) -> Option<RebaseProgress> {
+        let has_path = |relative_path: &str| {
+            let path = self.git_dir.join(PathBuf::from(relative_path));
+            path.exists()
+        };
+
+        let file_to_usize = |relative_path: &str| {
+            let path = self.git_dir.join(PathBuf::from(relative_path));
+            let contents = crate::utils::read_file(path).ok()?;
+            let quantity = contents.trim().parse::<usize>().ok()?;
+            Some(quantity)
+        };
+
+        let paths_to_progress = |current_path: &str, total_path: &str| {
+            let current = file_to_usize(current_path)?;
+            let end = file_to_usize(total_path)?;
+            Some(RebaseProgress { current, end })
+        };
+
+        if has_path("rebase-merge/msgnum") {
+            paths_to_progress("rebase-merge/msgnum", "rebase-merge/end")
+        } else if has_path("rebase-merge/onto") {
+            Some(RebaseProgress { current: 1, end: 1 })
+        } else if has_path("rebase-apply") {
+            paths_to_progress("rebase-apply/next", "rebase-apply/last")
+        } else {
+            None
+        }
     }
 
     pub fn commit_hash(&self) -> &Option<String> {
