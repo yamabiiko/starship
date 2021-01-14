@@ -131,14 +131,21 @@ impl Repository {
         self.state.get_or_init(|| self.get_state())
     }
 
+    // Loosely ported from git.git
+    // https://github.com/git/git/blob/master/contrib/completion/git-prompt.sh#L446 
     fn get_state(&self) -> GitState {
-        let merge_file = self.git_dir.join("MERGE_MSG");
+        let merge_file = self.git_dir.join("MERGE_HEAD");
         if merge_file.exists() {
             return GitState::Merge;
         }
 
-        let rebase_file = self.git_dir.join("REBASE_HEAD");
-        if rebase_file.exists() {
+        let bisect_file = self.git_dir.join("BISECT_LOG");
+        if bisect_file.exists() {
+            return GitState::Bisect;
+        }
+        
+        let rebase_merge_dir = self.git_dir.join("rebase-merge");
+        if rebase_merge_dir.exists() {
             let rebase_progress = self
                 .get_rebase_progress()
                 .unwrap_or_else(|| RebaseProgress { current: 1, end: 1 });
