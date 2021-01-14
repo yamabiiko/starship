@@ -51,6 +51,7 @@ pub struct Repository {
 }
 
 impl Repository {
+    /// Search up the directory tree for ".git" directories to identify git root
     pub fn discover(path: &Path) -> Option<Self> {
         log::trace!("Checking for Git instance: {:?}", path);
         if let Some(repository) = Repository::scan(path) {
@@ -63,6 +64,7 @@ impl Repository {
         }
     }
 
+    /// Check whether a given path is a git directory
     fn scan(path: &Path) -> Option<Self> {
         let git_dir = path.join(".git");
         if !git_dir.exists() {
@@ -77,6 +79,7 @@ impl Repository {
         })
     }
 
+    /// Get the status of the current git repo
     pub fn status(&self) -> &GitStatus {
         self.status.get_or_init(|| self.get_status())
     }
@@ -97,6 +100,7 @@ impl Repository {
         parse_porcelain_output(output)
     }
 
+    /// Get the branch name of the current git repo
     pub fn branch(&self) -> &String {
         self.branch.get_or_init(|| match self.get_branch() {
             Some(branch) => branch,
@@ -113,6 +117,7 @@ impl Repository {
         Some(trimmed_branch_name.into())
     }
 
+    /// Get the remote name of the current git repo
     pub fn remote(&self) -> &Option<String> {
         self.remote.get_or_init(|| self.get_remote())
     }
@@ -127,6 +132,7 @@ impl Repository {
         Some(stdout).filter(|s| !s.is_empty())
     }
 
+    /// Get the state of the current git repo
     pub fn state(&self) -> &GitState {
         self.state.get_or_init(|| self.get_state())
     }
@@ -185,6 +191,7 @@ impl Repository {
         }
     }
 
+    /// Get the hash of the active commit on the current git repo
     pub fn commit_hash(&self) -> &Option<String> {
         self.hash.get_or_init(|| self.get_commit_hash())
     }
@@ -202,6 +209,7 @@ impl Repository {
         Some(output.stdout)
     }
 
+    /// Get the tag of the active commit on the current git repo
     pub fn commit_tag(&self) -> &Option<String> {
         self.tag.get_or_init(|| self.get_commit_tag())
     }
