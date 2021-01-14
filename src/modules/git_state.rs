@@ -27,8 +27,8 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
                 _ => None,
             })
             .map(|variable| match variable {
-                "progress_current" => state_description.current.as_ref().map(Ok),
-                "progress_total" => state_description.total.as_ref().map(Ok),
+                "progress_current" => state_description.current.map(Ok),
+                "progress_total" => state_description.total.map(Ok),
                 _ => None,
             })
             .parse(None)
@@ -84,10 +84,12 @@ fn get_state_description<'a>(
             current: None,
             total: None,
         }),
-        GitState::Rebase (rebase_progress) => Some(StateDescription {
+        GitState::Rebase(rebase_progress) => Some(StateDescription {
             label: config.rebase,
-            current: Some(&rebase_progress.current.to_string()),
-            total: Some(&rebase_progress.end.to_string()),
+            current: None,
+            total: None,
+            // current: Some(&rebase_progress.current.to_string()),
+            // total: Some(&rebase_progress.end.to_string()),
         }),
     }
 }

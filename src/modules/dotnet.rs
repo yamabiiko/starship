@@ -64,12 +64,7 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
             })
             .map(|variable| match variable {
                 "version" => {
-                    let version = if enable_heuristic {
-                        let repo_root = context.repo().map(|r| r.root_dir);
-                        estimate_dotnet_version(&dotnet_files, &context.current_dir, repo_root)
-                    } else {
-                        get_version_from_cli()
-                    };
+                    let version = get_version_from_cli();
                     version.map(|v| Ok(v.0))
                 }
                 "tfm" => find_current_tfm(&dotnet_files).map(Ok),
@@ -174,32 +169,7 @@ fn estimate_dotnet_version(
 ///     - The root of the git repository
 ///       (If there is one)
 fn try_find_nearby_global_json(current_dir: &Path, repo_root: Option<PathBuf>) -> Option<Version> {
-    let current_dir_is_repo_root = repo_root.map(|r| r == current_dir).unwrap_or(false);
-    let parent_dir = if current_dir_is_repo_root {
-        // Don't scan the parent directory if it's above the root of a git repository
-        None
-    } else {
-        current_dir.parent()
-    };
-
-    // Check the parent directory, or otherwise the repository root, for a global.json
-    let mut check_dirs = parent_dir
-        .iter()
-        .chain(repo_root.iter())
-        .copied() // Copies the reference, not the Path itself
-        .collect::<Vec<&Path>>();
-
-    // The parent directory and repository root may be the same directory,
-    // so avoid checking it twice.
-    check_dirs.dedup();
-
-    check_dirs
-        .iter()
-        // repo_root may be the same as the current directory. We don't need to scan it again.
-        .filter(|&&d| d != current_dir)
-        .filter_map(|d| check_directory_for_global_json(d))
-        // This will lazily evaluate the first directory with a global.json
-        .next()
+    None
 }
 
 fn check_directory_for_global_json(path: &Path) -> Option<Version> {

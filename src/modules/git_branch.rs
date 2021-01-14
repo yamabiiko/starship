@@ -25,42 +25,26 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
         config.truncation_length as usize
     };
 
-<<<<<<< HEAD
-    let repo = context.get_repo().ok()?;
-=======
     let repo = context.repo().as_ref()?;
     let branch_name = repo.branch();
->>>>>>> 0245977... Update git_commit
 
-    let repo_root = repo.root.as_ref()?;
+    let repo_root = &repo.root_dir;
     let git_repo = Repository::open(repo_root).ok()?;
     let is_detached = git_repo.head_detached().ok()?;
     if config.only_attached && is_detached {
         return None;
     };
 
-    let branch_name = repo.branch.as_ref()?;
+    let branch_name = repo.branch();
     let mut graphemes: Vec<&str> = branch_name.graphemes(true).collect();
 
-    let mut remote_branch_graphemes: Vec<&str> = Vec::new();
     let mut remote_name_graphemes: Vec<&str> = Vec::new();
-    if let Some(remote) = repo.remote.as_ref() {
-        if let Some(branch) = &remote.branch {
-            remote_branch_graphemes = branch.graphemes(true).collect()
-        };
-        if let Some(name) = &remote.name {
-            remote_name_graphemes = name.graphemes(true).collect()
-        };
+    if let Some(remote) = repo.remote() {
+        remote_name_graphemes = remote.graphemes(true).collect();
     }
 
     // Truncate fields if need be
-    for e in [
-        &mut graphemes,
-        &mut remote_branch_graphemes,
-        &mut remote_name_graphemes,
-    ]
-    .iter_mut()
-    {
+    for e in [&mut graphemes, &mut remote_name_graphemes].iter_mut() {
         let e = &mut **e;
         let trunc_len = len.min(e.len());
         if trunc_len < e.len() {
@@ -70,8 +54,7 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
         }
     }
 
-    let show_remote = config.always_show_remote
-        || (!graphemes.eq(&remote_branch_graphemes) && !remote_branch_graphemes.is_empty());
+    let show_remote = config.always_show_remote;
 
     let parsed = StringFormatter::new(config.format).and_then(|formatter| {
         formatter
@@ -85,13 +68,8 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
             })
             .map(|variable| match variable {
                 "branch" => Some(Ok(graphemes.concat())),
-                "remote_branch" => {
-                    if show_remote && !remote_branch_graphemes.is_empty() {
-                        Some(Ok(remote_branch_graphemes.concat()))
-                    } else {
-                        None
-                    }
-                }
+                // TODO: Reintroduce "remote_branch"
+                "remote_branch" => None,
                 "remote_name" => {
                     if show_remote && !remote_name_graphemes.is_empty() {
                         Some(Ok(remote_name_graphemes.concat()))

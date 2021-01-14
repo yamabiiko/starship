@@ -1,9 +1,4 @@
 use super::{Context, Module, RootModuleConfig};
-<<<<<<< HEAD
-use git2::Repository;
-use git2::Time;
-=======
->>>>>>> 0245977... Update git_commit
 
 use crate::configs::git_commit::GitCommitConfig;
 use crate::formatter::StringFormatter;
@@ -27,7 +22,7 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
             })
             .map(|variable| match variable {
                 "hash" => repo
-                    .hash()
+                    .commit_hash().as_ref()
                     .map(|h| {
                         h.chars()
                             .take(config.commit_hash_length)
@@ -40,28 +35,9 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
     });
 
     if !config.tag_disabled {
-        // Let's get repo tags names
-        let tag_names = git_repo.tag_names(None).ok()?;
-        let tag_and_refs = tag_names.iter().flat_map(|name| {
-            let full_tag = format!("refs/tags/{}", name.unwrap());
-            let tag_obj = git_repo.find_reference(&full_tag)?.peel_to_tag()?;
-            let sig_obj = tag_obj.tagger().unwrap();
-            git_repo
-                .find_reference(&full_tag)
-                .map(|reference| (String::from(name.unwrap()), sig_obj.when(), reference))
-        });
+        let tag_name = repo.commit_tag();
 
-        let mut tag_name = String::new();
-        let mut oldest = Time::new(0, 0);
-        // Let's check if HEAD has some tag. If several, gets last created one...
-        for (name, timestamp, reference) in tag_and_refs.rev() {
-            if commit_oid == reference.peel_to_commit().ok()?.id() && timestamp > oldest {
-                tag_name = name;
-                oldest = timestamp;
-            }
-        }
-        // If we have tag...
-        if !tag_name.is_empty() {
+        if let Some(tag_name) = tag_name {
             parsed = StringFormatter::new(config.format).and_then(|formatter| {
                 formatter
                     .map_style(|variable| match variable {
@@ -69,10 +45,12 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
                         _ => None,
                     })
                     .map(|variable| match variable {
-                        "hash" => Some(Ok(id_to_hex_abbrev(
-                            commit_oid.as_bytes(),
-                            config.commit_hash_length,
-                        ))),
+                        "hash" => repo.commit_hash().as_ref().map(|hash| {
+                            Ok(hash
+                                .chars()
+                                .take(config.commit_hash_length)
+                                .collect::<String>())
+                        }),
                         _ => None,
                     })
                     .map(|variable| match variable {
@@ -93,18 +71,6 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
     });
 
     Some(module)
-}
-
-/// len specifies length of hex encoded string
-pub fn id_to_hex_abbrev(bytes: &[u8], len: usize) -> String {
-    bytes
-        .iter()
-        .map(|b| format!("{:02x}", b))
-        .collect::<Vec<String>>()
-        .join("")
-        .chars()
-        .take(len)
-        .collect()
 }
 
 #[cfg(test)]

@@ -33,7 +33,7 @@ pub enum GitState {
 }
 
 #[derive(PartialEq, Eq, Debug)]
-struct RebaseProgress {
+pub struct RebaseProgress {
     pub current: usize,
     pub end: usize,
 }
@@ -46,6 +46,8 @@ pub struct Repository {
     status: OnceCell<GitStatus>,
     state: OnceCell<GitState>,
     hash: OnceCell<Option<String>>,
+    remote: OnceCell<Option<String>>,
+    tag: OnceCell<Option<String>>,
 }
 
 impl Repository {
@@ -109,6 +111,20 @@ impl Repository {
         let branch_name = &head_contents[branch_start + 1..];
         let trimmed_branch_name = branch_name.trim_end();
         Some(trimmed_branch_name.into())
+    }
+
+    pub fn remote(&self) -> &Option<String> {
+        self.remote.get_or_init(|| self.get_remote())
+    }
+
+    fn get_remote(&self) -> Option<String> {
+        let stdout = utils::exec_cmd(
+            "git",
+            &["--git-dir", self.git_dir.to_str().unwrap(), "remote"],
+        )?
+        .stdout;
+
+        Some(stdout).filter(|s| !s.is_empty())
     }
 
     pub fn state(&self) -> &GitState {
@@ -177,6 +193,15 @@ impl Repository {
             ],
         )?;
         Some(output.stdout)
+    }
+
+    pub fn commit_tag(&self) -> &Option<String> {
+        self.tag.get_or_init(|| self.get_commit_tag())
+    }
+
+    fn get_commit_tag(&self) -> Option<String> {
+        // TODO: Actually get the tag
+        None
     }
 }
 
