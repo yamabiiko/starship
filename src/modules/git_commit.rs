@@ -12,6 +12,11 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
 
     let repo = context.repo().as_ref()?;
 
+    let is_detached = repo.branch() == "HEAD";
+    if config.only_detached && !is_detached {
+        return None;
+    };
+
     let mut parsed;
 
     parsed = StringFormatter::new(config.format).and_then(|formatter| {
@@ -22,7 +27,8 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
             })
             .map(|variable| match variable {
                 "hash" => repo
-                    .commit_hash().as_ref()
+                    .commit_hash()
+                    .as_ref()
                     .map(|h| {
                         h.chars()
                             .take(config.commit_hash_length)

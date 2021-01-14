@@ -111,10 +111,25 @@ impl Repository {
     fn get_branch(&self) -> Option<String> {
         let head_file = self.git_dir.join("HEAD");
         let head_contents = fs::read_to_string(head_file).ok()?;
-        let branch_start = head_contents.rfind('/')?;
-        let branch_name = &head_contents[branch_start + 1..];
-        let trimmed_branch_name = branch_name.trim_end();
-        Some(trimmed_branch_name.into())
+
+        // Example ".git/HEAD" on a branch:
+        // ```
+        // ref: refs/heads/libgit-to-git-cli
+        // ```
+        let branch_start = head_contents.rfind('/');
+        if let Some(branch_start) = branch_start {
+            let branch_name = &head_contents[branch_start + 1..];
+            let trimmed_branch_name = branch_name.trim_end();
+            return Some(trimmed_branch_name.into());
+        }
+
+        // Example ".git/HEAD" when detached:
+        // ```
+        // 3d158f4448b6e7ebcff704621225dac93c28f510
+        // ```
+        // If branch name isn't found, use the opportunity to set the repo hash
+        let _result = self.hash.set(Some(head_contents));
+        None
     }
 
     /// Get the remote name of the current git repo
@@ -138,7 +153,7 @@ impl Repository {
     }
 
     // Loosely ported from git.git
-    // https://github.com/git/git/blob/master/contrib/completion/git-prompt.sh#L446 
+    // https://github.com/git/git/blob/master/contrib/completion/git-prompt.sh#L446
     fn get_state(&self) -> GitState {
         let merge_file = self.git_dir.join("MERGE_HEAD");
         if merge_file.exists() {
@@ -149,7 +164,7 @@ impl Repository {
         if bisect_file.exists() {
             return GitState::Bisect;
         }
-        
+
         let rebase_merge_dir = self.git_dir.join("rebase-merge");
         if rebase_merge_dir.exists() {
             let rebase_progress = self
