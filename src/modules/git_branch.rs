@@ -39,12 +39,20 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
     let mut graphemes: Vec<&str> = branch_name.graphemes(true).collect();
 
     let mut remote_name_graphemes: Vec<&str> = Vec::new();
+    let mut remote_branch_graphemes: Vec<&str> = Vec::new();
     if let Some(remote) = repo.remote() {
-        remote_name_graphemes = remote.graphemes(true).collect();
+        remote_name_graphemes = remote.name.graphemes(true).collect();
+        remote_branch_graphemes = remote.branch.graphemes(true).collect();
     }
 
     // Truncate fields if need be
-    for e in [&mut graphemes, &mut remote_name_graphemes].iter_mut() {
+    for e in [
+        &mut graphemes,
+        &mut remote_branch_graphemes,
+        &mut remote_name_graphemes,
+    ]
+    .iter_mut()
+    {
         let e = &mut **e;
         let trunc_len = len.min(e.len());
         if trunc_len < e.len() {
@@ -54,7 +62,8 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
         }
     }
 
-    let show_remote = config.always_show_remote;
+    let show_remote = config.always_show_remote
+        || (!graphemes.eq(&remote_branch_graphemes) && !remote_branch_graphemes.is_empty());
 
     let parsed = StringFormatter::new(config.format).and_then(|formatter| {
         formatter
@@ -68,8 +77,13 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
             })
             .map(|variable| match variable {
                 "branch" => Some(Ok(graphemes.concat())),
-                // TODO: Reintroduce "remote_branch"
-                "remote_branch" => None,
+                "remote_branch" => {
+                    if show_remote && !remote_branch_graphemes.is_empty() {
+                        Some(Ok(remote_branch_graphemes.concat()))
+                    } else {
+                        None
+                    }
+                },
                 "remote_name" => {
                     if show_remote && !remote_name_graphemes.is_empty() {
                         Some(Ok(remote_name_graphemes.concat()))

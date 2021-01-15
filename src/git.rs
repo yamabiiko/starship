@@ -46,8 +46,14 @@ pub struct Repository {
     status: OnceCell<GitStatus>,
     state: OnceCell<GitState>,
     hash: OnceCell<Option<String>>,
-    remote: OnceCell<Option<String>>,
+    remote: OnceCell<Option<Remote>>,
     tag: OnceCell<Option<String>>,
+}
+
+#[derive(Debug)]
+pub struct Remote {
+    pub name: String,
+    pub branch: String,
 }
 
 impl Repository {
@@ -133,18 +139,35 @@ impl Repository {
     }
 
     /// Get the remote name of the current git repo
-    pub fn remote(&self) -> &Option<String> {
+    pub fn remote(&self) -> &Option<Remote> {
         self.remote.get_or_init(|| self.get_remote())
     }
 
-    fn get_remote(&self) -> Option<String> {
+    fn get_remote(&self) -> Option<Remote> {
         let stdout = utils::exec_cmd(
             "git",
-            &["--git-dir", self.git_dir.to_str().unwrap(), "remote"],
+            &[
+                "--git-dir",
+                self.git_dir.to_str().unwrap(),
+                "rev-parse",
+                "--symbolic-full-name",
+                "HEAD@{u}",
+            ],
         )?
         .stdout;
 
-        Some(stdout).filter(|s| !s.is_empty())
+        if stdout.is_empty() {
+            return None;
+        }
+
+        // Example output:
+        // ```
+        // refs/remotes/origin/libgit-to-git-cli
+        // ```
+        let mut elements = stdout.splitn(4, '/');
+        let name = elements.nth(2)?.to_owned();
+        let branch = elements.last()?.to_owned();
+        Some(Remote { name, branch })
     }
 
     /// Get the state of the current git repo
