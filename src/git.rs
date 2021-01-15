@@ -27,15 +27,21 @@ pub enum GitState {
     Revert,
     CherryPick,
     Bisect,
-    ApplyMailbox,
     ApplyMailboxOrRebase,
+    ApplyMailbox(RebaseProgress),
     Rebase(RebaseProgress),
 }
 
 #[derive(PartialEq, Eq, Debug)]
 pub struct RebaseProgress {
     pub current: usize,
-    pub end: usize,
+    pub total: usize,
+}
+
+impl Default for RebaseProgress {
+    fn default() -> Self {
+        Self { current: 1, total: 1 }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -176,8 +182,21 @@ impl Repository {
     }
 
     // Loosely ported from git.git
-    // https://github.com/git/git/blob/master/contrib/completion/git-prompt.sh#L446
+    // https://github.com/git/git/blob/master/contrib/completion/git-prompt.sh#L446-L469
     fn get_state(&self) -> GitState {
+        let file_to_usize = |relative_path: &str| {
+            let path = self.git_dir.join(PathBuf::from(relative_path));
+            let contents = crate::utils::read_file(path).ok()?;
+            let quantity = contents.trim().parse::<usize>().ok()?;
+            Some(quantity)
+        };
+
+        let paths_to_rebase_progress = |current_path: &str, total_path: &str| {
+            let current = file_to_usize(current_path)?;
+            let total = file_to_usize(total_path)?;
+            Some(RebaseProgress { current, total })
+        };
+
         let merge_file = self.git_dir.join("MERGE_HEAD");
         if merge_file.exists() {
             return GitState::Merge;
@@ -190,43 +209,28 @@ impl Repository {
 
         let rebase_merge_dir = self.git_dir.join("rebase-merge");
         if rebase_merge_dir.exists() {
-            let rebase_progress = self
-                .get_rebase_progress()
-                .unwrap_or_else(|| RebaseProgress { current: 1, end: 1 });
-            return GitState::Rebase(rebase_progress);
+            let progress = paths_to_rebase_progress("rebase-merge/msgnum", "rebase-merge/end");
+            return GitState::Rebase(progress.unwrap_or_default());
+        }
+
+        let rebase_apply_dir = self.git_dir.join("rebase-apply");
+        if rebase_apply_dir.exists() {
+            let progress = paths_to_rebase_progress("rebase-apply/next", "rebase-apply/last");
+            
+            let rebasing_file = self.git_dir.join("rebase-apply/rebasing");
+            if rebasing_file.exists() {
+                return GitState::Rebase(progress.unwrap_or_default());
+            }
+
+            let applying_file = self.git_dir.join("rebase-apply/applying");
+            if applying_file.exists() {
+               return GitState::ApplyMailbox(progress.unwrap_or_default());
+            }
+
+            return GitState::ApplyMailboxOrRebase;
         }
 
         GitState::Clean
-    }
-
-    fn get_rebase_progress(&self) -> Option<RebaseProgress> {
-        let has_path = |relative_path: &str| {
-            let path = self.git_dir.join(PathBuf::from(relative_path));
-            path.exists()
-        };
-
-        let file_to_usize = |relative_path: &str| {
-            let path = self.git_dir.join(PathBuf::from(relative_path));
-            let contents = crate::utils::read_file(path).ok()?;
-            let quantity = contents.trim().parse::<usize>().ok()?;
-            Some(quantity)
-        };
-
-        let paths_to_progress = |current_path: &str, total_path: &str| {
-            let current = file_to_usize(current_path)?;
-            let end = file_to_usize(total_path)?;
-            Some(RebaseProgress { current, end })
-        };
-
-        if has_path("rebase-merge/msgnum") {
-            paths_to_progress("rebase-merge/msgnum", "rebase-merge/end")
-        } else if has_path("rebase-merge/onto") {
-            Some(RebaseProgress { current: 1, end: 1 })
-        } else if has_path("rebase-apply") {
-            paths_to_progress("rebase-apply/next", "rebase-apply/last")
-        } else {
-            None
-        }
     }
 
     /// Get the hash of the active commit on the current git repo

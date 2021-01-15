@@ -19,7 +19,7 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
     let parsed = StringFormatter::new(config.format).and_then(|formatter| {
         formatter
             .map_meta(|variable, _| match variable {
-                "state" => Some(state_description.label),
+                "state" => Some(state_description.label.as_ref()),
                 _ => None,
             })
             .map_style(|variable| match variable {
@@ -27,8 +27,8 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
                 _ => None,
             })
             .map(|variable| match variable {
-                "progress_current" => state_description.current.map(Ok),
-                "progress_total" => state_description.total.map(Ok),
+                "progress_current" => state_description.current.as_ref().map(Ok),
+                "progress_total" => state_description.total.as_ref().map(Ok),
                 _ => None,
             })
             .parse(None)
@@ -51,53 +51,51 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
 fn get_state_description<'a>(
     state: &'a GitState,
     config: &GitStateConfig<'a>,
-) -> Option<StateDescription<'a>> {
+) -> Option<StateDescription> {
     match state {
         GitState::Clean => None,
         GitState::Merge => Some(StateDescription {
-            label: config.merge,
+            label: config.merge.to_string(),
             current: None,
             total: None,
         }),
         GitState::Revert => Some(StateDescription {
-            label: config.revert,
+            label: config.revert.to_string(),
             current: None,
             total: None,
         }),
         GitState::CherryPick => Some(StateDescription {
-            label: config.cherry_pick,
+            label: config.cherry_pick.to_string(),
             current: None,
             total: None,
         }),
         GitState::Bisect => Some(StateDescription {
-            label: config.bisect,
+            label: config.bisect.to_string(),
             current: None,
             total: None,
         }),
-        GitState::ApplyMailbox => Some(StateDescription {
-            label: config.am,
-            current: None,
-            total: None,
+        GitState::ApplyMailbox(rebase_progress) => Some(StateDescription {
+            label: config.am.to_string(),
+            current: Some(rebase_progress.current.to_string()),
+            total: Some(rebase_progress.total.to_string()),
         }),
         GitState::ApplyMailboxOrRebase => Some(StateDescription {
-            label: config.am_or_rebase,
+            label: config.am_or_rebase.to_string(),
             current: None,
             total: None,
         }),
         GitState::Rebase(rebase_progress) => Some(StateDescription {
-            label: config.rebase,
-            current: None,
-            total: None,
-            // current: Some(&rebase_progress.current.to_string()),
-            // total: Some(&rebase_progress.end.to_string()),
+            label: config.rebase.to_string(),
+            current: Some(rebase_progress.current.to_string()),
+            total: Some(rebase_progress.total.to_string()),
         }),
     }
 }
 
-struct StateDescription<'a> {
-    label: &'a str,
-    current: Option<&'a str>,
-    total: Option<&'a str>,
+struct StateDescription {
+    label: String,
+    current: Option<String>,
+    total: Option<String>,
 }
 
 #[cfg(test)]

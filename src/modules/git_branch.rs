@@ -26,8 +26,6 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
     };
 
     let repo = context.repo().as_ref()?;
-    let branch_name = repo.branch();
-
     let repo_root = &repo.root_dir;
     let git_repo = Repository::open(repo_root).ok()?;
     let is_detached = git_repo.head_detached().ok()?;
@@ -83,7 +81,7 @@ pub fn module<'a>(context: &'a Context) -> Option<Module<'a>> {
                     } else {
                         None
                     }
-                },
+                }
                 "remote_name" => {
                     if show_remote && !remote_name_graphemes.is_empty() {
                         Some(Ok(remote_name_graphemes.concat()))
