@@ -257,8 +257,18 @@ impl Repository {
     }
 
     fn get_commit_tag(&self) -> Option<String> {
-        // TODO: Actually get the tag
-        None
+        let output = utils::exec_cmd(
+            "git",
+            &[
+                "--git-dir",
+                self.git_dir.to_str().unwrap(),
+                "describe",
+                "--tags",
+                "--exact-match",
+                "HEAD"
+            ],
+        )?;
+        Some(output.stdout)
     }
 }
 
