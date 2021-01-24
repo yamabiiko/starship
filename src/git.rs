@@ -1,6 +1,7 @@
 use once_cell::sync::OnceCell;
 use std::fs;
 use std::path::{Path, PathBuf};
+use utils::CommandOutput;
 
 use crate::utils;
 
@@ -40,7 +41,10 @@ pub struct RebaseProgress {
 
 impl Default for RebaseProgress {
     fn default() -> Self {
-        Self { current: 1, total: 1 }
+        Self {
+            current: 1,
+            total: 1,
+        }
     }
 }
 
@@ -91,6 +95,12 @@ impl Repository {
         })
     }
 
+    // fn git_cmd(&self, args: &[&str]) -> Option<CommandOutput> {
+    //     let full_args = vec!["--git-dir", self.git_dir.to_str().unwrap()];
+    //     full_args.extend_from_slice(args);
+    //     utils::exec_cmd("git", full_args)
+    // }
+
     /// Get the status of the current git repo
     pub fn status(&self) -> &GitStatus {
         self.status.get_or_init(|| self.get_status())
@@ -102,6 +112,8 @@ impl Repository {
             &[
                 "--git-dir",
                 self.git_dir.to_str().unwrap(),
+                "--work-tree",
+                self.root_dir.to_str().unwrap(),
                 "status",
                 "--porcelain",
             ],
@@ -109,6 +121,7 @@ impl Repository {
             Some(output) => output.stdout,
             None => return Default::default(),
         };
+
         parse_porcelain_output(output)
     }
 
@@ -216,7 +229,7 @@ impl Repository {
         let rebase_apply_dir = self.git_dir.join("rebase-apply");
         if rebase_apply_dir.exists() {
             let progress = paths_to_rebase_progress("rebase-apply/next", "rebase-apply/last");
-            
+
             let rebasing_file = self.git_dir.join("rebase-apply/rebasing");
             if rebasing_file.exists() {
                 return GitState::Rebase(progress.unwrap_or_default());
@@ -224,7 +237,7 @@ impl Repository {
 
             let applying_file = self.git_dir.join("rebase-apply/applying");
             if applying_file.exists() {
-               return GitState::ApplyMailbox(progress.unwrap_or_default());
+                return GitState::ApplyMailbox(progress.unwrap_or_default());
             }
 
             return GitState::ApplyMailboxOrRebase;
@@ -265,7 +278,7 @@ impl Repository {
                 "describe",
                 "--tags",
                 "--exact-match",
-                "HEAD"
+                "HEAD",
             ],
         )?;
         Some(output.stdout)
@@ -297,7 +310,6 @@ fn parse_porcelain_output<S: Into<String>>(porcelain: S) -> GitStatus {
         if letter_codes.0 == letter_codes.1 {
             vcs_status.conflicted += 1
         } else {
-            increment_git_status(&mut vcs_status, 'S');
             increment_git_status(&mut vcs_status, letter_codes.1);
         }
     });
