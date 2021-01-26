@@ -306,15 +306,32 @@ fn parse_porcelain_output<S: Into<String>>(porcelain: S) -> GitStatus {
             characters.next().unwrap_or(' '),
         );
 
-        // TODO: Revisit conflict and staged logic
-        if letter_codes.0 == letter_codes.1 {
-            vcs_status.conflicted += 1
-        } else {
-            increment_git_status(&mut vcs_status, letter_codes.1);
-        }
+
+        // // TODO: Revisit conflict and staged logic
+        // if letter_codes.0 == letter_codes.1 {
+        //     vcs_status.conflicted += 1
+        // } else {
+        //     increment_git_status(&mut vcs_status, letter_codes.1);
+        // }
     });
 
     vcs_status
+}
+
+fn check_porcelain_line(vcs_status: &mut GitStatus, letter_codes: (char, char)) {
+    match letter_codes {
+        // Check for untracked files
+        ('?', '?') => vcs_status.untracked += 1,
+        
+        // Check for staged files
+        ('A', _) => vcs_status.added += 1,
+        ('M', ' ') => vcs_status.added += 1,
+        ('M', 'M') => vcs_status.added += 1,
+        ('M', 'D') => vcs_status.added += 1,
+        ('U', 'A') => vcs_status.added += 1,
+
+        (_, _) => (),
+    }
 }
 
 /// Update the cumulative git status, given the "short format" letter of a file's status
